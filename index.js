@@ -1,6 +1,6 @@
 const express = require('express')
 const cors = require('cors')
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 
 const port = process.env.PORT || 5000;
@@ -28,7 +28,7 @@ async function run() {
     const jobsCollections = client.db('soloDB').collection('jobs');
 
     // save all jobsData in db
-    app.post('/add-job', async(req, res) =>{
+    app.post('/add-job', async (req, res) => {
       const jobData = req.body;
       const result = await jobsCollections.insertOne(jobData);
       console.log(result);
@@ -36,11 +36,49 @@ async function run() {
     })
 
     // get all data
-    app.get('/jobs', async(req, res) => {
+    app.get('/jobs', async (req, res) => {
       const result = await jobsCollections.find().toArray();
       res.send(result);
     })
-
+    // get all jobs posted by a specific user
+    app.get('/jobs/:email', async (req, res) => {
+      const email = req.params.email;
+      const query = { 'buyer.email': email }
+      const result = await jobsCollections.find(query).toArray();
+      res.send(result);
+    })
+    // delete single data form my posted jobs
+    app.delete('/job/:id', async (req, res) => {
+      const id = req.params.id;
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: "Invalid ID format" });
+      }
+      const query = { _id: new ObjectId(id) };
+      const result = await jobsCollections.deleteOne(query)
+      res.send(result);
+    })
+    // get a single job data form db
+    app.get('/job/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await jobsCollections.findOne(query);
+      res.send(result);
+    })
+    // update a job data in db
+    app.put('/update-job/:id', async (req, res) => {
+      const id = req.params.id;
+      const jobData = req.body;
+      const updatedDoc = {
+        $set: jobData,
+      }
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send({ error: "Invalid ID format" });
+      }
+      const filter = { _id: new ObjectId(id) };
+      const option = { upsert: true };
+      const result = await jobsCollections.updateOne(filter, updatedDoc, option);
+      res.send(result);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
